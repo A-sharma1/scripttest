@@ -1,0 +1,5 @@
+http://backupforrestore.blogspot.in/
+
+http://www.symantec.com/connect/blogs/understanding-how-netbackup-writes-tape
+
+http://www.virtualdennis.com/netbackup-7-configuration-for-vmware-vstorage-backups/
