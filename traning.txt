@@ -1,0 +1,20 @@
+
+alicreate"SERVERHBA1", "wwn of tango HBA1"
+
+alicreate"ServerHBA2", "wwn of tango HBA3"
+
+alicreate"ALPHA_CNTLA", "wwn of alpha cntl A"
+
+alicreate"DELTA_TAPE1", "wwn of Delta tape1"
+
+zonecreate"TANGO_ALPHA", "TANGO_HBA1; ALPHA_CNTLA"
+
+zonecreate "TANGO_TAPE", "TANGO_HBA3; DELTA_TAPE1"
+
+cfgcreate "CFG1","TANGO_ALPHA; TANGO_TAPE"(if you are creating brand new Fabric)or
+
+cfgadd "CFG1","TANGO_ALPHA; TANGO_TAPE"( if you have already created config file)
+
+cfgsave
+
+cfgenable "CFG1"
