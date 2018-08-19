@@ -3,3 +3,569 @@ http://backupforrestore.blogspot.in/
 http://www.symantec.com/connect/blogs/understanding-how-netbackup-writes-tape
 
 http://www.virtualdennis.com/netbackup-7-configuration-for-vmware-vstorage-backups/
+
+
+
+Resolving network communication problems with UNIX clients
+
+The following procedure is for resolving NetBackup communications problems, such as those associated with NetBackup status codes 54, 57, and 58. This procedure consists of two variations: one for UNIX clients and another for PC clients.
+
+Note:
+	
+
+In all cases, ensure that your network configuration works correctly outside of NetBackup before trying to resolve NetBackup problems.
+
+For UNIX clients, perform the following steps. Before you start this procedure, add the VERBOSE option to the /usr/openv/netbackup/bp.conf file. Also, create a bpcd debug log directory on your server and clients and a bprd log directory on the server. During subsequent retries, the debug logs provide detailed debug information, which can help you analyze the problem.
+
+Table: Steps for resolving network communication problems with UNIX clients
+
+Step
+	
+
+Action
+	
+
+Description
+
+Step 1
+	
+
+Test a new or modified confitguration.
+	
+
+If this configuration is a new or a modified configuration, do the following:
+
+    Check any recent modifications to ensure that they did not introduce the problem.
+
+    Ensure that the client software was installed and that it supports the client operating system.
+
+    Check the client names, server names, and service entries in your NetBackup configuration as explained in the following topic:
+
+    See Verifying host name and service entries in NetBackup.
+
+    You can also use the hostname command on the client to determine the host name that the client sends with requests to the server. Check the bprd debug log (verbose) on the server to determine what occurred when the server received the request.
+
+    Note the required NIS or DNS updates. Failure to update these services properly is a common source of network problems.
+
+Step 2
+	
+
+Verify network connectivity.
+	
+
+Verify network connectivity between client and server by trying to ping the client from the server.
+
+# ping clientname
+
+Where clientname is the name of the client as configured in the NetBackup policy configuration, in /etc/hosts, and in NIS and DNS (if applicable).
+
+For example, to ping a client that is named ant:
+
+# ping ant    
+    ant.nul.nul.com: 64 byte packets
+    64 bytes from 199.199.199.24: icmp_seq=0. time=1. ms
+    ----ant.nul.nul.com PING Statistics----
+    2 packets transmitted, 2 packets received, 0% packet 
+    loss round-trip (ms)  min/avg/max = 1/1/1
+
+Also, try ping from the client to the server.
+
+If ping succeeds in both instances, it verifies connectivity between the server and client. If ping fails, you have a network problem outside of NetBackup that must be resolved before you proceed.
+
+Some forms of the ping command let you ping the bpcd port on the client as in the following command:
+
+# ping ant 13782
+
+Or
+
+# ping ant bpcd
+
+Step 3
+	
+
+Ensure that the client listens on the correct port for the bpcd connections.
+	
+
+Run one of the following commands (depending on platform and operating system):
+
+netstat -a | grep bpcd
+netstat -a | grep 13782
+rpcinfo -p | grep 13782
+
+If no problem occurs with the port, the results are similar to:
+tcp 0 0 *.13782 *.* LISTEN
+
+LISTEN indicates that the client listens for connections on this port.
+
+If a problem occurs, this line does not appear. One of the following conditions may exist:
+
+    /etc/services (or applicable NIS file) does not have the correct bpcd entry. The correct /etc services entry is:
+
+    bpcd  13782/tcp    bpcd
+
+    /etc/inetd.conf (or applicable NIS or DNS file) does not have the correct bpcd entry. The correct /etc/inetd.conf entry is:
+
+    bpcd stream tcp nowait root /usr/openv/netbackup/bin/bpcd
+
+    /etc/inetd.conf was changed but was not re-read. Correct this condition by running one of the following (whichever works):
+
+    /bin/ps -ef | grep inetd
+    kill -HUP the_inetd_pid
+
+    Or
+
+    /bin/ps -aux | grep inetd
+    kill -HUP the_inetd_pid
+
+On a Hewlett-Packard platform, use inetd -c to send a SIGHUP to inetd.
+
+On an AIX client, use SMIT to verify that the InetServ object policy was updated with information about the bpcd process (/etc/inetd.conf and /etc/services information). If you use SMIT to modify the InetServ object policy, the inetexp command automatically runs. If you edit the InetServ object policy, run the inetexp command to export the InetServ object policy to the /etc/inetd.conf and /etc/services files. This command keeps these files in sync with the InetServ object policy. Run the following command to inform the inetd daemon of the changes to its configuration file:
+
+refresh -s inetd or kill -1 InetdPID
+
+Step 4
+	
+
+Connect to the client through telnet.
+	
+
+telnet to bpcd on the client. If it succeeds, keep the connection until after you perform step 5, then terminate it with Ctrl-c.
+
+telnet clientname 13782
+
+Where clientname is the name of the client as configured in the NetBackup policy configuration, /etc/hosts, and also in NIS and DNS (if applicable).
+
+For example,
+
+# telnet ant bpcd
+Trying 199.999.999.24 ...
+Connected to ant.nul.nul.com.
+Escape character is '^]'.
+
+In this example, telnet can establish a connection to the client ant.
+
+    If the telnet succeeds, then inetd on the client is configured correctly. It can pass its connection to bpcd and NetBackup should also be able to establish a connection.
+
+    If telnet doesn't work, ensure that the inetd.conf file and /etc/services files on both the server and client are correct and match. By default, these are as follows:
+
+    In /etc/services:
+
+    bpcd  13782/tcp    bpcd
+
+    In /etc/inetd.conf:
+
+    bpcd stream tcp nowait root /usr/openv/netbackup/bin/bpcd bpcd
+
+    Then, run kill -HUP to reread the /etc/inetd.conf file as explained in step 3.
+
+    Also, update the applicable NIS or DNS files.
+
+    If these files are correct and you cannot connect to the client, you may have problems with the network routing or the port assignment. (See the next step.)
+
+Step 5
+	
+
+Ensure that the client listens on the correct port for the telnet connection to bpcd.
+	
+
+Run one of the following commands (depending on platform and operating system).
+
+netstat -a | grep bpcd
+netstat -a | grep 13782
+rpcinfo -p | grep 13782
+
+The value 13782 could also be the value that is specified during installation.
+
+One of the following conditions occurs:
+
+    If the port is not the problem, you see the following:
+
+    tcp 0 0 ant.nul.nul.com.13782 whale...com.1516 ESTABLISHED
+    tcp 0 0 *.13782 *.* LISTEN
+
+    Where ESTABLISHED indicates that the telnet connection was established to bpcd through port 13782 on the client. LISTEN indicates that the client listens for further connections on this port.
+
+    Change the port number for bpcd or other NetBackup services only if there is no alternative. All NetBackup servers and clients in the configuration must use this new port assignment.
+
+    If a process other than bpcd uses the port, try to reboot the client to clear the problem. If the problem is still not fixed, you may need to change one of the service numbers (preferably for the other service). To change a service number, modify the /etc/services files Then send SIGHUP signals to the inetd processes on your clients.
+
+    /bin/ps -ef | grep inetd
+    kill -HUP the_inetd_pid
+
+    Or
+
+    /bin/ps -aux | grep inetd
+    kill -HUP the_inetd_pid
+
+    On a Hewlett-Packard platform, use inetd -c to send a SIGHUP to inetd. Also make applicable NIS or DNS updates.
+
+    If the problem is with an AIX client and you make changes to the /etc/inetd.conf and /etc/services information, use SMIT to verify that the InetServ object policy was updated. See step 3.
+
+Step 6
+	
+
+Verify communication between the client and the master server.
+	
+
+To verify client to master server communications, use the bpclntcmd utility. When -pn and -sv run on a NetBackup client, they initiate inquiries to the NetBackup master server (as configured in the client bp.conf file). The master server then returns information to the requesting client. More information is available about bpclntcmd.
+
+See About the bpclntcmd utility.
+
+See Resolving network communication problems with PC clients
+
+See Troubleshooting NetBackup problems
+
+
+
+
+
+
+Melonm Documentation Project
+Netbackup Howto
+
+Installation | Operation | BackupExec
+Installation
+
+Procedures of setting up Netbackup?
+
+    configure robots
+    add tape drives
+    configure volume pools
+    add volumes to the volume pools
+    define a class for clients
+    make a backup schedule the clients
+
+How to add clients to Netbackup?
+
+    You add clients to Class. From Administrative GUI, Backup Policy Management --> Class --> Clients --> New.
+        Be default, Veritas Netbackup requires all backup image in the tape MUST have the same retension level. So make sure the Retension Level is consistant with the target Volume Pool.
+    To install client software from Unix server, make sure rsh (or the trust) is enabled from the NetBackup server to the NetBackup client then right-click on the Master Server and select Install UNIX Client Software.
+    If rsh (or a trust) is not enabled, then you will need to use /usr/openv/netbackup/bin/install_client_files ftp clientname username.
+        In all above 2 methods, make sure /usr/openv/netbackup/bp.conf has correct FQDN server name sepcified. Sometime install program only give a short host name, which often can not be resolved and you will get 'connection refused' error.
+        Make sure client & server names are all in /etc/hosts on both sides and resolvable.
+    To install client from client side (or Jumpstart installation):
+        Install tarball
+        Modify $NETBACKUP/bp.conf with correct SERVER & CLIENT_NAME
+        Add entries for Netbackup in /etc/inetd.conf & /etc/services, restart inetd
+
+How to setup Linux Redhat 7.x client with Netbackup?
+
+    Make sure firewall is not started. Stop ipchains and add necessary rules later if it needs to stay. This will open ports for Netbackup client's daemons.
+    Make sure Redhat 7.x BSD r-commands (rsh & rlogin) services are started. For security reasons, these services need to be started in order for Master server to push the client installation package. Make sure root can rsh from master to Redhat client without supplying password. Close r-services after installation.
+    Modify /usr/openv/netbackup/client/Linux/Redhat/install_client script if it is necessary. Redhat since version 7.0 has replaced inetd with xinetd and most services startup scripts have been moved to /etc/xinetd.d directory. Customized install_client script to make it working with xinetd.
+    Install client either by running install_client or from GUI (xnb). Check install_client script if there is any error. Check the log file under /usr/openv/netbackup/log/bpcd for more specific errors.
+    Add /etc/xinetd.d/bpcd file as follow: More details can be obtained from Veritas website.
+        # bpcd is the service for the NBU program.
+        service bpcd
+        {
+        disable = no
+        socket_type = stream
+        wait = no
+        user = root
+        server = /usr/openv/netbackup/bin/bpcd
+        }
+    Modify /etc/services file to add more entries for netbackup daemons. (if it is not added by install_client script).
+    kill -HUP <xinetd pid> and netstat -a | grep bpcd to ensure bpcd is listening.
+
+How to remove NetBackup Agent in Solaris client?
+
+    Remove all things under /usr/openv
+    Comment out the following 4 lines in /etc/services
+    #bpcd 13782/tcp bpcd
+    #vopied 13783/tcp vopied
+    #bpjava-msvc 13722/tcp bpjava-msvc
+    #bprd 13720/tcp bprd
+    Comment out the following 3 lines in /etc/inetd.conf
+    #bpcd stream tcp nowait root /usr/openv/netbackup/bin/bpcd bpcd
+    #vopied stream tcp nowait root /usr/openv/bin/vopied vopied
+    #bpjava-msvc stream tcp nowait root /usr/openv/netbackup/bin/bpjava-msvc bpjava-msvc -transient
+    In Solaris 10, disable the following 3 services:
+    # svcadm disable svc:/network/bpcd/tcp:default
+    # svcadm disable svc:/network/vopied/tcp:default
+    # svcadm disable svc:/network/bpjava-msvc/tcp:default
+
+Operation
+
+Character based management tool for netbackup
+
+bpadm will do configure & manage all daily backup & restore jobs.
+
+    /usr/openv/volmgr/bin/tpconfig # device configuration GUI -- xdevadm
+    /usr/openv/volmgr/bin/vmadm # volume configuration GUI -- xvmadm
+    /usr/openv/netbackup/bin/bp # carry out backup & restore
+    /usr/openv/netbackup/bin/bpadm # configuration + management GUI -- xbpadm
+
+Netbackup Commands:
+
+    Start:/etc/rc2.d/S77netbackup
+        or: /usr/openv/netbackup/bin/initbprd
+        /usr/openv/netbackup/bin/initbpdbm
+    Stop: /etc/rc0.d/K77netbackup
+        or bp.kill_all in the /usr/openv/netbackup/bin/goodies directory
+    Running processes: bpps -a
+    License key: /usr/openv/netbackup/bin/admincmd/get_license_key
+    Backup overview for particular client
+        /opt/openv/netbackup/bin/admincmd/bpcoverage -c database1
+    Show drive status from command line:
+        /usr/openv/volmgr/bin/vmoprcmd
+        tpconfig -d
+        tpconfig -l
+    Install/remove devices: /usr/openv/volmgr/bin/tpconfig
+    List all jobs (from master server & media server):
+        $netbackup/bin/admincmd/bpdbjobs -report -all_columns
+    Which currently defined classes have backup windows that include the supplied date and time:
+        /usr/openv/netbackup/bin/admincmd/bpschedreq -predict MM/DD/YYYY HH:MM:SS
+    Command Line Interface
+        Activity Monitor:
+            bperror -backstat -hoursago xx --> list jobs within the last xx hours
+            report job errors (if any) over past 48 hours
+                bperror -U -backstat -hoursago 48
+            bperror -backstat -d mm/dd/yy -e mm/dd/yy" --> -d is date range start and -e is end.
+    A comprehensive report of media status:
+        $NETBACKUP/bin/goodies/available_media
+
+bpimagelist
+
+    List backup history
+        bpimagelist -U -client oracle-prd-srv -policy ORACLE_WH_UNIX -d 12/15/2012 -e 12/18/2012
+        bpimagelist -U -client oracle-prd-srv -policy ORACLE_WH_UNIX -hoursago 48
+            -U: User format (most readable)
+            -L: Long mode (more details)
+            -l: short mode (easy to display if you know each column)
+    List required tapes for a particular restore:
+        Find out exact start time of backup: bpimagelist -U -client <client name> -d 08/01/2001 -e /08/01/2001
+        Then find out volumes: bpimagelist -media -U -client <client name> -d 08/01/2001 05:05 -e 08/01/2001 05:05
+
+bppllist
+
+    List all policies
+        /opt/openv/netbackup/bin/admincmd/bppllist -U
+    List policy as well as schedule
+        bppllist -allpolicies -U | grep -i <keyword>
+    Get schedules for particular client
+        bppllist -U -byclient database1
+            bppllist -byclient database1 | grep CLASS --> get all policies to this client
+            bppllist -byclient database1 | grep INCLUDE --> get all file systems backed up for this client
+
+bpplclients
+
+    List all backup clients
+        /opt/openv/netbackup/bin/admincmd/bpplclients
+
+nbpemreq
+
+    Check backup schedule for a point of time in the future
+        /opt/openv/netbackup/bin/admincmd/nbpemreq -predict -date 09/19/2011 18:00:00
+        Note: The date has to be future date.
+
+How to report backup status through email?
+
+Under ~goodies directory, there are lots of 'goodies'. One of them -- mail_bp_reports -- can be used to send notification to specified email account. Cron it and you will see. Here is a modified version (consolidate all 3 messages into 1).
+
+How to grant non-root users to use Java Administrative Interface?
+
+    In the master server, create a system group which contains the user who will login in through Java administrative interface;
+    /usr/openv/netbackup/bin/nonroot_admin, specify the group which is just created.
+    Change the NetBackup-Java authorization file, /usr/openv/java/auth.conf, to provide the desired capabilities for the affected users. For example, to provide Activity Monitor & Device Monitor capability, add: neilsu ADMIN=DM+AM.
+    For more details, refer to Netbackup System Administrator's Guide.
+
+How to grant user to use Netbackup Administration Client?
+
+    Symptom: Could not connect to Master Server from Administrative Client, received "The list of Storage Units could not be retrivied, status:37 operation requested by an invalid server".
+    You have to make sure that your administrative client is in the bp.conf file of the master server as: SERVER=administrative client name and in your vm.conf file as: KNOWN=administrative client name.
+
+How to report media status (bpmedialist & vmquery)?
+
+    bpmedialist -summary --> list a summary of all active & inactive media with expiration date
+    bpmedialist -L/-l -p <VolumePool> --> report of media ID belong to this pool (-L or -l option will product Long & Short format).
+    bpmedialist -mcontents -ev <media id> --> report contents on specified media (media will be loaded into drive and it will take a LONG TIME to complete).
+    bpmedialist -mlist -ev <media id> --> report summary on specified media
+    bpmedialist -rl <retention level> --> report media that are using this retention level. Default retention level are:
+        0 1 week | 1 2 weeks | 2 3 weeks | 3 1 month | 4 2 months | 5 3 months | 6 6 months | 7 9 months | 8 1 year | 9 Infinity
+        Media List with NBU3.4 will not show any Media which are not assigned. To get a full view of all media, click Media Manager --> Volume Pools.
+        You can run $NETBACKUP/bin/goodies/available_media to see which media is available (not assigned).
+        When you use bpmedialist to query media ID which is not assigned, you will get error message as "requested media id was not found in NB media database and/or MM volume database".
+    vmquery -pn <volume pool> --> report based on volume pool
+    vmquery -p <volume pool> --> report on cleaning tape
+    vmquery -m <media id> --> report based on media ID
+
+How to enable pre/post script for NBU backups (5.1)?
+
+    In specific backup client, move bpstart_notify & bpsend_notify from goodies directory to /usr/openv/netbackup/bin
+    Append policy to the script, eg bpstart_notify.policyname. NBU will then execute script only for that policy.
+    Append schedule behind policy, eg, bpstart_notify.policyname.schedule, NBU will then execute script only for that policy & schedule.
+
+How to get details of specific job?
+
+    /usr/openv/netbackup/bin/admincmd/bpdbjobs -jobid <id> -all_columns
+
+What is the default location of Catalogs Database?
+
+    By default, the catalogs are stored in the following locations:
+    /usr/openv/netbackup/db
+    /usr/openv/volmgr/db
+
+How to restore netbackup tape through another server?
+
+Sunsolve offical response: Doc ID 22049.
+
+Alternate-Client Restore in Netbackup
+
+NBU in nature has given more consideration to security & human error than OmniBack. In OBII, you can restore any clients from Administrative Client, but in NBU, you can:
+
+    Restore any files from NBU media server back to original clients;
+    Restore files from backup clients to Administrative Clients (alternative-client restore);
+    Running command from one client to restore files belonging to other clients (alternative-client restore).
+
+You can not run Administrative Client to restore files from one client to another client (except files belonging to AC itself). This is more secure and different than OBII.
+
+Some procedures to setup Alternative-Client.
+
+    Allowing All Clients to Perform Alternate-Client Restores
+        The administrator can allow all clients to restore backups belonging to other clients by creating the following file on the NetBackup master server:
+            /usr/openv/netbackup/db/altnames/No.Restrictions
+        For example, assume that a user on a UNIX client named freddie wants to restore a file that was backed up by a client named oscar:
+            The administrator creates the following file on the master server:
+            /usr/openv/netbackup/db/altnames/No.Restrictions
+            The user on freddie changes the NetBackup client name setting in the client user interface on freddie to oscar. Backup, Archive and Restore -> Actions -> Specify Netbackup Machines -> Clients -> Configure Current Client to be the client where files have been backup.
+            Then, you can restore oscar files to your local machine.
+    Only Allowing a Single Client to Perform Alternate-Client Restores
+        The administrator can give a single client permission to restore backups belonging to other clients by creating an empty file named
+            /usr/openv/netbackup/db/altnames/ peername
+        for the client that is to have the restore privileges. This file must be on the master server.
+
+BackupExec
+
+Replace the BackupExec Database
+
+    The database is standard SQL database, which contains /media servers/jobs/media/device information.
+    Stopped all BE services and SQL Server(BKUPEXEC) service.
+    In C:\Program Files\Symantec\Backup Exec\Data, renamed 2 db files: bedb_log.ldf & bedb_dat.mdf
+    Copied new databases files into above location and start SQL & BE services.
+
+Copyright @ 2011 Melonm Documentation Project, All rights reserved.
+
+Terms of Use | Privacy Statement | e-mail webmaster
+
+
+
+
+
+
+
+
+
+    Norton
+    Small & Medium Business
+    Enterprise
+    Partners
+
+Symantec | United States
+
+    Enterprise
+
+Change CountryUnited States
+
+    Shopping
+
+    Products & Solutions
+    Support & Communities
+    Security Response
+    Try & Buy
+
+/ Support / Search Results / KB Article
+
+    Add
+
+
+Procedure to start 'bpcd' in standalone mode if it does not respond to connection attempts.
+Article:TECH24724 	 |  	Created: 2003-01-31 	 |  	Updated: 2013-10-23 	 |  	Article URL http://www.symantec.com/docs/TECH24724
+Article Type
+Technical Solution
+
+Product(s)
+Show all
+
+Environment
+Show all
+
+Languages
+Show all
+Issue
+
+
+Procedure to start 'bpcd' in standalone mode if it does not respond to connection attempts.
+
+Solution
+
+
+Sometimes it happens that bpcd appears to be 'listening' but does not respond to connection attempts.
+The netstat -a command shows bpcd listening:
+
+netstat -a | grep bpcd
+     *.bpcd               *.*                0      0 24576      0 LISTEN
+
+But bpcd does not respond to connection attempts, and there is no log produced in the bpcd log directory.
+
+This could be because of some problem with the OS or the inetd process. This may occur when there is a security wrapper in the inetd.conf configuration file. This is an OS problem to be solved by the system administrator. For a quick fix they can remove the security wrapper for bpcd, if they are using one.
+
+Check the /etc/inetd.conf file. You might see a line for bpcd that looks something like:
+
+bpcd    stream  tcp     nowait  root    /usr/local/sbin/tcpd    /usr/openv/netbackup/bin/bpcd
+
+Comment out the line with the 'wrapper' and add the line as configured by NetBackup:
+
+# bpcd    stream  tcp     nowait  root    /usr/local/sbin/tcpd    /usr/openv/netbackup/bin/bpcd
+bpcd    stream  tcp     nowait  root    /usr/openv/netbackup/bin/bpcd bpcd
+
+Stop all the VERITAS NetBackup (tm) processes:
+
+/usr/openv/netbackup/bin/goodies/bp.kill_all
+
+Re-read the inetd.conf file:
+
+ps -ef | grep inetd
+kill -HUP {inetd_pid}
+
+Restart NetBackup. Try to connect to the bpcd daemon, or try a backup.
+
+telnet {hostname} bpcd
+
+If the connection to bpcd still cannot be established (or there is no security wrapper), the bpcd process can be run in 'standalone' mode as a workaround.
+
+You might not be able to start the bpcd process because it cannot bind to port 13782. In that case, you will get a message:
+
+bpcd -standalone
+bind(13782) failed: 125
+
+The following steps will allow bpcd to be started in standalone mode.
+
+Edit the /etc/inetd.conf file by commenting out the bpcd line:
+
+# bpcd    stream  tcp     nowait  root    /usr/openv/netbackup/bin/bpcd bpcd
+
+Stop all the NetBackup processes:
+
+/usr/openv/netbackup/bin/goodies/bp.kill_all
+
+Re-read the inetd.conf file:
+
+ps -ef | grep inetd
+kill -HUP {inetd_pid}
+
+Now bpcd will not be listening. You will be able to start it in standalone mode with:
+
+bpcd -standalone
+
+Restart NetBackup. Try to connect to the bpcd daemon, or try a backup.
+
+telnet {hostname} bpcd
+
+The system administrator will have to fix the inetd function for a permanent fix. But this will get backups running.
+
+
+njwmdld;q
+jndkadml
+jAXNKAMLA,Q
+JNKADLQKDO
+DKWDQLDQ
