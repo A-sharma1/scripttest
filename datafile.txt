@@ -10,7 +10,7 @@ Resolving network communication problems with UNIX clients
 
 The following procedure is for resolving NetBackup communications problems, such as those associated with NetBackup status codes 54, 57, and 58. This procedure consists of two variations: one for UNIX clients and another for PC clients.
 
-Note:
+Note:hjbik';';l
 	
 
 In all cases, ensure that your network configuration works correctly outside of NetBackup before trying to resolve NetBackup problems.
